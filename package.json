@@ -1,0 +1,47 @@
+{
+  "name": "serve-sequelize",
+  "version": "1.0.0",
+  "description": "Expose securely and conveniently your data to consumers",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cyppan/serve-sequelize.git"
+  },
+  "keywords": [
+    "api",
+    "rest",
+    "json",
+    "sequelize"
+  ],
+  "author": "cyppan",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cyppan/serve-sequelize/issues"
+  },
+  "homepage": "https://github.com/cyppan/serve-sequelize#readme",
+  "devDependencies": {
+    "@babel/cli": "^7.2.0",
+    "@babel/core": "^7.2.0",
+    "@babel/preset-env": "^7.2.0",
+    "acorn": "^6.0.4",
+    "eslint": "^5.9.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.14.0",
+    "mocha": "^5.2.0"
+  },
+  "dependencies": {
+    "express-async-handler": "^1.1.4",
+    "immutable": "^4.0.0-rc.12",
+    "sequelize": "^4.41.2",
+    "validate-data-tree": "^1.0.0"
+  },
+  "peerDependencies": {
+    "express": "^4.16.4",
+    "body-parser": "^1.18.3",
+    "cors": "^2.8.5",
+    "pg": "^7.7.1"
+  }
+}
