@@ -85,7 +85,7 @@ const syncDb = (sequelize, insertFixturesFn) => {
 };
 
 const connect = (config) => {
-  const Op = Sequelize.Op;
+  const { Op } = Sequelize;
   const operatorsAliases = {
     $eq: Op.eq,
     $ne: Op.ne,
@@ -120,16 +120,16 @@ const connect = (config) => {
     $any: Op.any,
     $all: Op.all,
     $values: Op.values,
-    $col: Op.col
+    $col: Op.col,
   };
 
-  const { database, username, password, ...options } = config;
-  sequelize = new Sequelize(database, username, password, {
+  const {
+    database, username, password, ...options
+  } = config;
+  return new Sequelize(database, username, password, {
     ...options,
     operatorsAliases,
   });
-
-  return sequelize;
 };
 
 module.exports = {

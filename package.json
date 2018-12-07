@@ -4,6 +4,7 @@
   "description": "Expose securely and conveniently your data to consumers",
   "main": "src/index.js",
   "scripts": {
+    "lint": "eslint src",
     "test": "mocha"
   },
   "repository": {

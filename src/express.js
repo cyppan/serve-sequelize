@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, import/no-unresolved */
 const express = require('express');
 const { ValidationError, ValidationErrorItem, ForeignKeyConstraintError } = require('sequelize');
 const { mapKeyToPath, ValidationErrors } = require('validate-data-tree');
@@ -47,14 +48,14 @@ const mapQueryParams = (req, res, next) => {
 };
 
 express.application.resource = function (
-  Resource, sequelize
+  Resource, sequelize,
 ) {
   const app = this;
 
-  app.resourcesRegistry = app.resourcesRegistry || {}
-  app.viewsRegistry = app.viewsRegistry || {}
+  app.resourcesRegistry = app.resourcesRegistry || {};
+  app.viewsRegistry = app.viewsRegistry || {};
 
-  app.resourcesRegistry[Resource.name] = Resource
+  app.resourcesRegistry[Resource.name] = Resource;
 
   const Model = sequelize.models[Resource.name];
   const {
@@ -142,7 +143,8 @@ express.application.resource = function (
     }));
   }
 
-  Object.values(views).forEach(({ path: viewPath, attributes }) => {
+  Object.entries(views).forEach(([viewName, { path: viewPath, attributes }]) => {
+    app.viewsRegistry[viewName] = Resource;
     app.get(viewPath, asyncHandler(async (req, res) => {
       const docs = await Model.findAll({
         attributes,
