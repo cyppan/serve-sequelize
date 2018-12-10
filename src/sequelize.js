@@ -34,7 +34,7 @@ const buildModel = (resource) => {
       delete modelSchema[field].sequelizeType;
       if (modelSchema[field].type === Sequelize.JSONB && fieldSchema.schema) {
         modelSchema[field].validate = modelSchema[field].validate || {};
-        modelSchema[field].validate.nestedSchema = o => validate(o, fieldSchema.schema, [field]);
+        modelSchema[field].validate.nestedSchema = o => validate({[field]: o}, {[field]: fieldSchema}, []);
       }
     }
   });

@@ -22,8 +22,16 @@ const mapException = (err, req, res, _) => {
     validatorArgs,
   }));
 
-  if (err instanceof ValidationError) {
-    res.status(422).json(mapValidationErrors(err.errors));
+  if (err instanceof ValidationError && Array.isArray(err.errors) && err.errors.length && err.errors[0].message instanceof ValidationErrors) {
+    res.status(422).json(mapValidationErrors(err.errors[0].message.errors));
+  } else if (err instanceof ValidationError) {
+    res.status(422).json(
+      mapValidationErrors(
+        flatMap(err.errors, e =>
+          e.message instanceof ValidationErrors ? e.message.errors : [e]
+        )
+      )
+    );
   } else if (err instanceof ForeignKeyConstraintError) {
     res.status(422).json([{
       message: err.message,

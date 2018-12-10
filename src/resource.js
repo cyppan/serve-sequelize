@@ -139,7 +139,10 @@ const schema = {
   },
   $: {
     validate: {
-      allowedKeys: ['name', 'path', 'associations', 'operations', 'schema', 'views', 'authorize'],
+      allowedKeys: [
+        'name', 'path', 'associations', 'operations', 'schema', 'views',
+        'authorize', 'hooks',
+      ],
     },
   },
 };
