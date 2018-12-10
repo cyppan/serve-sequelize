@@ -1,6 +1,7 @@
 const Sequelize = require('sequelize');
 const { validate } = require('validate-data-tree');
 const { getIn } = require('immutable');
+const { validateResource } = require('./resource');
 
 const mapType = {
   string: Sequelize.STRING,
@@ -18,6 +19,7 @@ const mapType = {
 };
 
 const buildModel = (resource) => {
+  validateResource(resource);
   const modelSchema = {};
   const modelOptions = {
     hooks: resource.hooks,
