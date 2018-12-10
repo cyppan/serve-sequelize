@@ -3,6 +3,7 @@ const {
 } = require('./sequelize');
 const { mapException, mapQueryParams } = require('./express');
 const { genOpenApiJson, genSwaggerJson } = require('./swagger');
+const { validateResource } = require('./resource');
 
 module.exports = {
   connect,

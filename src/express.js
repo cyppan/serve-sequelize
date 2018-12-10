@@ -4,6 +4,7 @@ const { ValidationError, ValidationErrorItem, ForeignKeyConstraintError } = requ
 const { mapKeyToPath, ValidationErrors } = require('validate-data-tree');
 const { Set, getIn } = require('immutable');
 const asyncHandler = require('express-async-handler');
+const { validateResource } = require('./resource');
 
 const mapException = (err, req, res, _) => {
   const flatMap = (xs, f) => xs.reduce((acc, x) => acc.concat(f(x)), []);
@@ -47,9 +48,8 @@ const mapQueryParams = (req, res, next) => {
   }
 };
 
-express.application.resource = function (
-  Resource, sequelize,
-) {
+express.application.resource = function (Resource, sequelize) {
+  validateResource(Resource);
   const app = this;
 
   app.resourcesRegistry = app.resourcesRegistry || {};
