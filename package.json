@@ -38,7 +38,7 @@
     "express-async-handler": "^1.1.4",
     "immutable": "^4.0.0-rc.12",
     "sequelize": "^4.41.2",
-    "validate-data-tree": "^1.0.4"
+    "validate-data-tree": "^1.0.5"
   },
   "peerDependencies": {
     "express": "^4.16.4",
