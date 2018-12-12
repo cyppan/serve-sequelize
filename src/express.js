@@ -199,6 +199,21 @@ express.application.resource = function (Resource, sequelize) {
       });
       res.json(docs);
     }));
+    app.get(`${viewPath}/:id(\\d+)/`, asyncHandler(async (req, res) => {
+      const doc = await Model.findOne({
+        attributes: mapAttributes(null, Resource.name, attributes),
+        where: {
+          id: req.params.id,
+          ...(buildWhere && buildWhere(req)),
+        },
+        include: mapInclude(req, include),
+      });
+      if (doc) {
+        res.json(doc);
+      } else {
+        res.sendStatus(404);
+      }
+    }));
   });
 
   if (operations.includes('post')) {
