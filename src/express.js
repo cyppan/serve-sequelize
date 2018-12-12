@@ -73,13 +73,14 @@ express.application.resource = function (Resource, sequelize) {
   const mapAttributes = (attributes, resourceKey) => {
     const resource = resourceKey ? app.resourcesRegistry[resourceKey] : Resource;
     const allowedAttributes = Object.keys(resource.schema)
+      .filter(k => !getIn(resource, ['attributes', 'include'])
+        || resource.attributes.include.includes(k))
       .concat(['id', 'createdAt', 'updatedAt'])
       // TODO stronger inclusion of foreign keys
       .concat(getIn(resource, ['associations', 'belongsTo'], []).map(spec => `${spec.resource}Id`))
       .filter(k => k !== '$')
-      // TODO support include too
-      .filter(k => !getIn(resource, ['authorize', 'filterAttributes', 'exclude'])
-        || !resource.authorize.filterAttributes.exclude.includes(k));
+      .filter(k => !getIn(resource, ['attributes', 'exclude'])
+        || !resource.attributes.exclude.includes(k));
     return ((!attributes || !attributes.length) && allowedAttributes)
       || Set(attributes).intersect(allowedAttributes).toJS();
   };
@@ -168,7 +169,7 @@ express.application.resource = function (Resource, sequelize) {
         beforeCreate(req);
       }
       const authValidate = getIn(Resource, ['authorize', 'validate']);
-      if (authValidate && !authValidate(req)(req.body)) {
+      if (authValidate && !authValidate(req)) {
         throw new ValidationError(null, [
           new ValidationErrorItem('authorize validation failed', 'forbidden', '$', req.body),
         ]);
@@ -184,34 +185,58 @@ express.application.resource = function (Resource, sequelize) {
 
   if (operations.includes('put')) {
     app.put(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
-      const model = await Model.findByPk(req.params.id);
-      model.set(req.body);
-      await model.save();
-      const doc = await Model.findOne({
-        attributes: mapAttributes(),
-        where: mapWhere(req, { id: req.params.id }),
-      });
-      res.send(doc);
+      const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
+      if (model) {
+        const authValidate = getIn(Resource, ['authorize', 'validate']);
+        if (authValidate && !authValidate(req, model)) {
+          throw new ValidationError(null, [
+            new ValidationErrorItem('authorize validation failed', 'forbidden', '$', req.body),
+          ]);
+        }
+        model.set(req.body);
+        await model.save();
+        const doc = await Model.findOne({
+          attributes: mapAttributes(),
+          where: mapWhere(req, { id: req.params.id }),
+        });
+        res.send(doc);
+      } else {
+        res.sendStatus(404);
+      }
     }));
   }
 
   if (operations.includes('patch')) {
     app.patch(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
-      const model = await Model.findByPk(req.params.id);
-      await model.update(req.body);
-      const doc = await Model.findOne({
-        attributes: mapAttributes(),
-        where: mapWhere(req, { id: req.params.id }),
-      });
-      res.send(doc);
+      const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
+      if (model) {
+        const authValidate = getIn(Resource, ['authorize', 'validate']);
+        if (authValidate && !authValidate(req, model)) {
+          throw new ValidationError(null, [
+            new ValidationErrorItem('authorize validation failed', 'forbidden', '$', req.body),
+          ]);
+        }
+        await model.update(req.body);
+        const doc = await Model.findOne({
+          attributes: mapAttributes(),
+          where: mapWhere(req, { id: req.params.id }),
+        });
+        res.send(doc);
+      } else {
+        res.sendStatus(404);
+      }
     }));
   }
 
   if (operations.includes('delete')) {
     app.delete(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
-      const model = await Model.findByPk(req.params.id);
-      await model.destroy();
-      res.sendStatus(204);
+      const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
+      if (model) {
+        await model.destroy();
+        res.sendStatus(204);
+      } else {
+        res.sendStatus(404);
+      }
     }));
   }
 };

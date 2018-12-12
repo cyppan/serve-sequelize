@@ -84,6 +84,27 @@ const schema = {
       },
     },
   },
+  attributes: {
+    type: 'object',
+    schema: {
+      include: {
+        type: 'array',
+        schema: {
+          $: {
+            type: 'string',
+          },
+        },
+      },
+      exclude: {
+        type: 'array',
+        schema: {
+          $: {
+            type: 'string',
+          },
+        },
+      },
+    },
+  },
   views: {
     type: 'object',
     allowNull: true,
@@ -141,7 +162,7 @@ const schema = {
     validate: {
       allowedKeys: [
         'name', 'path', 'associations', 'operations', 'schema', 'views',
-        'authorize', 'hooks',
+        'attributes', 'authorize', 'hooks',
       ],
     },
   },
