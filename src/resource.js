@@ -18,7 +18,7 @@ const validateField = (field, prefix = []) => {
   validate(field, {
     type: {
       type: 'string',
-      allowNull: true,
+      allowNull: false,
       validate: {
         isIn: [[
           'string', 'text', 'integer', 'bigint', 'float', 'double',
@@ -162,7 +162,7 @@ const schema = {
     validate: {
       allowedKeys: [
         'name', 'path', 'associations', 'operations', 'schema', 'views',
-        'attributes', 'authorize', 'hooks',
+        'attributes', 'authorize', 'hooks', 'order',
       ],
     },
   },

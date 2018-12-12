@@ -56,6 +56,17 @@ const mapQueryParams = (req, res, next) => {
   }
 };
 
+const parseIntQueryParam = (req, key) => {
+  if (req.query && req.query[key]) {
+    const n = parseInt(req.query[key]);
+    return !Number.isNaN(n) && n;
+  }
+  return null;
+};
+
+const MaxPageLimit = 100;
+const DefaultPageLimit = 100;
+
 express.application.resource = function (Resource, sequelize) {
   validateResource(Resource);
   const app = this;
@@ -70,17 +81,21 @@ express.application.resource = function (Resource, sequelize) {
     path, operations = [], views = {},
   } = Resource;
 
-  const mapAttributes = (attributes, resourceKey) => {
+  const mapAttributes = (attributes, resourceKey, viewAttributes = null) => {
     const resource = resourceKey ? app.resourcesRegistry[resourceKey] : Resource;
     const allowedAttributes = Object.keys(resource.schema)
       .filter(k => !getIn(resource, ['attributes', 'include'])
         || resource.attributes.include.includes(k))
+      .filter(k => !viewAttributes || !viewAttributes.include
+        || viewAttributes.include.includes(k))
       .concat(['id', 'createdAt', 'updatedAt'])
       // TODO stronger inclusion of foreign keys
       .concat(getIn(resource, ['associations', 'belongsTo'], []).map(spec => `${spec.resource}Id`))
       .filter(k => k !== '$')
       .filter(k => !getIn(resource, ['attributes', 'exclude'])
-        || !resource.attributes.exclude.includes(k));
+        || !resource.attributes.exclude.includes(k))
+      .filter(k => !viewAttributes || !viewAttributes.exclude
+        || !viewAttributes.exclude.includes(k));
     return ((!attributes || !attributes.length) && allowedAttributes)
       || Set(attributes).intersect(allowedAttributes).toJS();
   };
@@ -115,10 +130,14 @@ express.application.resource = function (Resource, sequelize) {
             include: include ? mapInclude(req, include, includeResource) : [],
             required: false,
           };
-        } if (viewResource) {
+        }
+        if (viewResource) {
+          const { attributes: viewAttributes, buildWhere, include: viewInclude } = viewResource.views[view];
           return {
             model: sequelize.models[viewResource.name],
-            attributes: viewResource.views[view].attributes,
+            ...(buildWhere && { where: buildWhere(req) }),
+            attributes: mapAttributes(null, viewResource.name, viewAttributes),
+            include: include ? mapInclude(req, viewInclude, viewResource) : [],
             required: false,
           };
         }
@@ -128,12 +147,23 @@ express.application.resource = function (Resource, sequelize) {
     }).filter(include => include && include.model);
   };
 
+  const mapOrder = orderParam => orderParam && orderParam.split(',').map(
+    p => p.startsWith('-') ? [p.slice(1), 'DESC'] : [p, 'ASC']
+  );
+
   if (operations.includes('get')) {
     app.get(path, asyncHandler(async (req, res) => {
-      const docs = await Model.findAll({
+      const limitParam = parseIntQueryParam(req, 'limit');
+      const docs = await Model.findAndCountAll({
         attributes: mapAttributes(getIn(req.query, ['params', 'attributes'])),
         where: mapWhere(req, getIn(req.query, ['params', 'where'])),
         include: mapInclude(req, getIn(req.query, ['params', 'include'])),
+        // raw: true,
+        offset: parseIntQueryParam(req, 'offset') || 0,
+        limit: (limitParam && limitParam > MaxPageLimit && MaxPageLimit)
+          || limitParam
+          || DefaultPageLimit,
+        order: mapOrder(req.query.order) || Resource.order,
       });
       res.json(docs);
     }));
@@ -152,11 +182,20 @@ express.application.resource = function (Resource, sequelize) {
     }));
   }
 
-  Object.entries(views).forEach(([viewName, { path: viewPath, attributes }]) => {
+  // Building views
+  Object.entries(views).forEach(([viewName, { path: viewPath, attributes, buildWhere, include, order }]) => {
     app.viewsRegistry[viewName] = Resource;
     app.get(viewPath, asyncHandler(async (req, res) => {
-      const docs = await Model.findAll({
-        attributes,
+      const limitParam = parseIntQueryParam(req, 'limit');
+      const docs = await Model.findAndCountAll({
+        attributes: mapAttributes(null, Resource.name, attributes),
+        ...(buildWhere && { where: buildWhere(req) }),
+        include: mapInclude(req, include),
+        offset: parseIntQueryParam(req, 'offset') || 0,
+        limit: (limitParam && limitParam > MaxPageLimit && MaxPageLimit)
+          || limitParam
+          || DefaultPageLimit,
+        order: mapOrder(req.query.order) || order,
       });
       res.json(docs);
     }));
