@@ -154,7 +154,7 @@ const schema = {
         Object.entries(o).forEach(([k, v]) => {
           validateField(v, ['schema', k]);
         });
-        return Object.keys(o).length > 0;
+        return true;
       },
     },
   },
