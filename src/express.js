@@ -81,23 +81,25 @@ const extendExpress = (express) => {
       path, operations = [], views = {},
     } = Resource;
 
-    const mapAttributes = (attributes, resourceKey, viewAttributes = null) => {
+    const mapAttributes = (resourceKey, viewAttributes = null, userAttributes = null) => {
       const resource = resourceKey ? app.resourcesRegistry[resourceKey] : Resource;
-      const allowedAttributes = Object.keys(resource.schema)
+      return Object.keys(resource.schema)
+        .concat(['id', 'createdAt', 'updatedAt'])
+        // TODO stronger inclusion of foreign keys
+        .concat(getIn(resource, ['associations', 'belongsTo'], []).map(spec => `${spec.resource}Id`))
         .filter(k => !getIn(resource, ['attributes', 'include'])
           || resource.attributes.include.includes(k))
         .filter(k => !viewAttributes || !viewAttributes.include
           || viewAttributes.include.includes(k))
-        .concat(['id', 'createdAt', 'updatedAt'])
-        // TODO stronger inclusion of foreign keys
-        .concat(getIn(resource, ['associations', 'belongsTo'], []).map(spec => `${spec.resource}Id`))
+        .filter(k => !userAttributes || !userAttributes.include
+          || userAttributes.include.includes(k))
         .filter(k => k !== '$')
         .filter(k => !getIn(resource, ['attributes', 'exclude'])
           || !resource.attributes.exclude.includes(k))
         .filter(k => !viewAttributes || !viewAttributes.exclude
-          || !viewAttributes.exclude.includes(k));
-      return ((!attributes || !attributes.length) && allowedAttributes)
-        || Set(attributes).intersect(allowedAttributes).toJS();
+          || !viewAttributes.exclude.includes(k))
+        .filter(k => !userAttributes || !userAttributes.exclude
+          || !userAttributes.exclude.includes(k));
     };
 
     const mapWhere = (req, where, resourceKey) => {
@@ -112,7 +114,7 @@ const extendExpress = (express) => {
     const mapInclude = (req, resourceInclude, resourceKey) => {
       const resource = resourceKey ? app.resourcesRegistry[resourceKey] : Resource;
       return resourceInclude && resourceInclude.map(({
-        resource: includeResource, view, where, attributes, include,
+        resource: includeResource, view, where, attributes, include, required,
       }) => {
         const viewResource = view && app.viewsRegistry[view];
         const hasResourceAssociation = [
@@ -126,19 +128,19 @@ const extendExpress = (express) => {
             return {
               model: sequelize.models[includeResource],
               where: mapWhere(req, where, includeResource),
-              attributes: mapAttributes(attributes, includeResource),
+              attributes: mapAttributes(includeResource, null, attributes),
               include: include ? mapInclude(req, include, includeResource) : [],
-              required: false,
+              required: required || false,
             };
           }
           if (viewResource) {
-            const { attributes: viewAttributes, buildWhere, include: viewInclude } = viewResource.views[view];
+            const { attributes: viewAttributes, buildWhere } = viewResource.views[view];
             return {
               model: sequelize.models[viewResource.name],
               ...(buildWhere && { where: buildWhere(req) }),
-              attributes: mapAttributes(null, viewResource.name, viewAttributes),
+              attributes: mapAttributes(viewResource.name, viewAttributes, attributes),
               include: include ? mapInclude(req, viewInclude, viewResource) : [],
-              required: false,
+              required: required || false,
             };
           }
           return null;
@@ -155,7 +157,7 @@ const extendExpress = (express) => {
       app.get(path, asyncHandler(async (req, res) => {
         const limitParam = parseIntQueryParam(req, 'limit');
         const docs = await Model.findAndCountAll({
-          attributes: mapAttributes(getIn(req.query, ['params', 'attributes'])),
+          attributes: mapAttributes(null, null, getIn(req.query, ['params', 'attributes'])),
           where: mapWhere(req, getIn(req.query, ['params', 'where'])),
           include: mapInclude(req, getIn(req.query, ['params', 'include'])),
           // raw: true,
@@ -170,7 +172,7 @@ const extendExpress = (express) => {
 
       app.get(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
         const doc = await Model.findOne({
-          attributes: mapAttributes(getIn(req.query, ['params', 'attributes'])),
+          attributes: mapAttributes(null, null, getIn(req.query, ['params', 'attributes'])),
           where: mapWhere(req, { id: req.params.id }),
           include: mapInclude(req, getIn(req.query, ['params', 'include'])),
         });
@@ -188,7 +190,7 @@ const extendExpress = (express) => {
       app.get(viewPath, asyncHandler(async (req, res) => {
         const limitParam = parseIntQueryParam(req, 'limit');
         const docs = await Model.findAndCountAll({
-          attributes: mapAttributes(null, Resource.name, attributes),
+          attributes: mapAttributes(Resource.name, attributes, getIn(req.query, ['params', 'attributes'])),
           ...(buildWhere && { where: buildWhere(req) }),
           include: mapInclude(req, include),
           offset: parseIntQueryParam(req, 'offset') || 0,
@@ -201,7 +203,7 @@ const extendExpress = (express) => {
       }));
       app.get(`${viewPath}/:id(\\d+)/`, asyncHandler(async (req, res) => {
         const doc = await Model.findOne({
-          attributes: mapAttributes(null, Resource.name, attributes),
+          attributes: mapAttributes(Resource.name, attributes, getIn(req.query, ['params', 'attributes'])),
           where: {
             id: req.params.id,
             ...(buildWhere && buildWhere(req)),
