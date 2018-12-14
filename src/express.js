@@ -134,12 +134,12 @@ const extendExpress = (express) => {
             };
           }
           if (viewResource) {
-            const { attributes: viewAttributes, buildWhere } = viewResource.views[view];
+            const { attributes: viewAttributes, buildWhere, include: viewInclude } = viewResource.views[view];
             return {
               model: sequelize.models[viewResource.name],
               ...(buildWhere && { where: buildWhere(req) }),
               attributes: mapAttributes(viewResource.name, viewAttributes, attributes),
-              include: include ? mapInclude(req, viewInclude, viewResource) : [],
+              include: viewInclude ? mapInclude(req, viewInclude, viewResource.name) : [],
               required: required || false,
             };
           }
