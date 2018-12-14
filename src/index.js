@@ -1,7 +1,7 @@
 const {
   connect, syncDb, buildAndRegisterModel, setupAssociations,
 } = require('./sequelize');
-const { mapException, mapQueryParams } = require('./express');
+const { mapException, mapQueryParams, extendExpress } = require('./express');
 const { genOpenApiJson, genSwaggerJson } = require('./swagger');
 const { validateResource } = require('./resource');
 
@@ -12,6 +12,7 @@ module.exports = {
   setupAssociations,
   mapException,
   mapQueryParams,
+  extendExpress,
   genOpenApiJson,
   genSwaggerJson,
 };

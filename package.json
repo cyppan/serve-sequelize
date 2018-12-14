@@ -1,6 +1,6 @@
 {
   "name": "serve-sequelize",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Expose securely and conveniently your data to consumers",
   "main": "src/index.js",
   "scripts": {
@@ -35,8 +35,12 @@
     "mocha": "^5.2.0"
   },
   "dependencies": {
+    "body-parser": "^1.18.3",
+    "cors": "^2.8.5",
+    "express": "^4.16.4",
     "express-async-handler": "^1.1.4",
     "immutable": "^4.0.0-rc.12",
+    "pg": "^7.7.1",
     "sequelize": "^4.41.2",
     "validate-data-tree": "^1.0.5"
   },

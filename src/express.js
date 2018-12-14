@@ -1,5 +1,4 @@
 /* eslint-disable no-unused-vars, import/no-unresolved */
-const express = require('express');
 const { ValidationError, ValidationErrorItem, ForeignKeyConstraintError } = require('sequelize');
 const { mapKeyToPath, ValidationErrors } = require('validate-data-tree');
 const { Set, getIn } = require('immutable');
@@ -67,235 +66,238 @@ const parseIntQueryParam = (req, key) => {
 const MaxPageLimit = 100;
 const DefaultPageLimit = 100;
 
-express.application.resource = function (Resource, sequelize) {
-  validateResource(Resource);
-  const app = this;
+const extendExpress = (express) => {
+  express.application.resource = function (Resource, sequelize) {
+    validateResource(Resource);
+    const app = this;
 
-  app.resourcesRegistry = app.resourcesRegistry || {};
-  app.viewsRegistry = app.viewsRegistry || {};
+    app.resourcesRegistry = app.resourcesRegistry || {};
+    app.viewsRegistry = app.viewsRegistry || {};
 
-  app.resourcesRegistry[Resource.name] = Resource;
+    app.resourcesRegistry[Resource.name] = Resource;
 
-  const Model = sequelize.models[Resource.name];
-  const {
-    path, operations = [], views = {},
-  } = Resource;
+    const Model = sequelize.models[Resource.name];
+    const {
+      path, operations = [], views = {},
+    } = Resource;
 
-  const mapAttributes = (attributes, resourceKey, viewAttributes = null) => {
-    const resource = resourceKey ? app.resourcesRegistry[resourceKey] : Resource;
-    const allowedAttributes = Object.keys(resource.schema)
-      .filter(k => !getIn(resource, ['attributes', 'include'])
-        || resource.attributes.include.includes(k))
-      .filter(k => !viewAttributes || !viewAttributes.include
-        || viewAttributes.include.includes(k))
-      .concat(['id', 'createdAt', 'updatedAt'])
-      // TODO stronger inclusion of foreign keys
-      .concat(getIn(resource, ['associations', 'belongsTo'], []).map(spec => `${spec.resource}Id`))
-      .filter(k => k !== '$')
-      .filter(k => !getIn(resource, ['attributes', 'exclude'])
-        || !resource.attributes.exclude.includes(k))
-      .filter(k => !viewAttributes || !viewAttributes.exclude
-        || !viewAttributes.exclude.includes(k));
-    return ((!attributes || !attributes.length) && allowedAttributes)
-      || Set(attributes).intersect(allowedAttributes).toJS();
-  };
+    const mapAttributes = (attributes, resourceKey, viewAttributes = null) => {
+      const resource = resourceKey ? app.resourcesRegistry[resourceKey] : Resource;
+      const allowedAttributes = Object.keys(resource.schema)
+        .filter(k => !getIn(resource, ['attributes', 'include'])
+          || resource.attributes.include.includes(k))
+        .filter(k => !viewAttributes || !viewAttributes.include
+          || viewAttributes.include.includes(k))
+        .concat(['id', 'createdAt', 'updatedAt'])
+        // TODO stronger inclusion of foreign keys
+        .concat(getIn(resource, ['associations', 'belongsTo'], []).map(spec => `${spec.resource}Id`))
+        .filter(k => k !== '$')
+        .filter(k => !getIn(resource, ['attributes', 'exclude'])
+          || !resource.attributes.exclude.includes(k))
+        .filter(k => !viewAttributes || !viewAttributes.exclude
+          || !viewAttributes.exclude.includes(k));
+      return ((!attributes || !attributes.length) && allowedAttributes)
+        || Set(attributes).intersect(allowedAttributes).toJS();
+    };
 
-  const mapWhere = (req, where, resourceKey) => {
-    const resource = resourceKey ? app.resourcesRegistry[resourceKey] : Resource;
-    const filterWhere = getIn(resource, ['authorize', 'filterWhere']);
-    if (!filterWhere) return where;
-    return where ? {
-      $and: [filterWhere(req), where],
-    } : filterWhere(req);
-  };
+    const mapWhere = (req, where, resourceKey) => {
+      const resource = resourceKey ? app.resourcesRegistry[resourceKey] : Resource;
+      const filterWhere = getIn(resource, ['authorize', 'filterWhere']);
+      if (!filterWhere) return where;
+      return where ? {
+        $and: [filterWhere(req), where],
+      } : filterWhere(req);
+    };
 
-  const mapInclude = (req, resourceInclude, resourceKey) => {
-    const resource = resourceKey ? app.resourcesRegistry[resourceKey] : Resource;
-    return resourceInclude && resourceInclude.map(({
-      resource: includeResource, view, where, attributes, include,
-    }) => {
-      const viewResource = view && app.viewsRegistry[view];
-      const hasResourceAssociation = [
-        ...getIn(resource, ['associations', 'belongsTo'], []),
-        ...getIn(resource, ['associations', 'hasMany'], []),
-        ...getIn(resource, ['associations', 'hasOne'], []),
-        ...getIn(resource, ['associations', 'belongsToMany'], []),
-      ].find(assoc => assoc.resource === (includeResource || (viewResource && viewResource.name)));
-      if (hasResourceAssociation) {
-        if (includeResource) {
-          return {
-            model: sequelize.models[includeResource],
-            where: mapWhere(req, where, includeResource),
-            attributes: mapAttributes(attributes, includeResource),
-            include: include ? mapInclude(req, include, includeResource) : [],
-            required: false,
-          };
-        }
-        if (viewResource) {
-          const { attributes: viewAttributes, buildWhere, include: viewInclude } = viewResource.views[view];
-          return {
-            model: sequelize.models[viewResource.name],
-            ...(buildWhere && { where: buildWhere(req) }),
-            attributes: mapAttributes(null, viewResource.name, viewAttributes),
-            include: include ? mapInclude(req, viewInclude, viewResource) : [],
-            required: false,
-          };
+    const mapInclude = (req, resourceInclude, resourceKey) => {
+      const resource = resourceKey ? app.resourcesRegistry[resourceKey] : Resource;
+      return resourceInclude && resourceInclude.map(({
+        resource: includeResource, view, where, attributes, include,
+      }) => {
+        const viewResource = view && app.viewsRegistry[view];
+        const hasResourceAssociation = [
+          ...getIn(resource, ['associations', 'belongsTo'], []),
+          ...getIn(resource, ['associations', 'hasMany'], []),
+          ...getIn(resource, ['associations', 'hasOne'], []),
+          ...getIn(resource, ['associations', 'belongsToMany'], []),
+        ].find(assoc => assoc.resource === (includeResource || (viewResource && viewResource.name)));
+        if (hasResourceAssociation) {
+          if (includeResource) {
+            return {
+              model: sequelize.models[includeResource],
+              where: mapWhere(req, where, includeResource),
+              attributes: mapAttributes(attributes, includeResource),
+              include: include ? mapInclude(req, include, includeResource) : [],
+              required: false,
+            };
+          }
+          if (viewResource) {
+            const { attributes: viewAttributes, buildWhere, include: viewInclude } = viewResource.views[view];
+            return {
+              model: sequelize.models[viewResource.name],
+              ...(buildWhere && { where: buildWhere(req) }),
+              attributes: mapAttributes(null, viewResource.name, viewAttributes),
+              include: include ? mapInclude(req, viewInclude, viewResource) : [],
+              required: false,
+            };
+          }
+          return null;
         }
         return null;
-      }
-      return null;
-    }).filter(include => include && include.model);
+      }).filter(include => include && include.model);
+    };
+
+    const mapOrder = orderParam => orderParam && orderParam.split(',').map(
+      p => p.startsWith('-') ? [p.slice(1), 'DESC'] : [p, 'ASC']
+    );
+
+    if (operations.includes('get')) {
+      app.get(path, asyncHandler(async (req, res) => {
+        const limitParam = parseIntQueryParam(req, 'limit');
+        const docs = await Model.findAndCountAll({
+          attributes: mapAttributes(getIn(req.query, ['params', 'attributes'])),
+          where: mapWhere(req, getIn(req.query, ['params', 'where'])),
+          include: mapInclude(req, getIn(req.query, ['params', 'include'])),
+          // raw: true,
+          offset: parseIntQueryParam(req, 'offset') || 0,
+          limit: (limitParam && limitParam > MaxPageLimit && MaxPageLimit)
+            || limitParam
+            || DefaultPageLimit,
+          order: mapOrder(req.query.order) || Resource.order,
+        });
+        res.json(docs);
+      }));
+
+      app.get(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
+        const doc = await Model.findOne({
+          attributes: mapAttributes(getIn(req.query, ['params', 'attributes'])),
+          where: mapWhere(req, { id: req.params.id }),
+          include: mapInclude(req, getIn(req.query, ['params', 'include'])),
+        });
+        if (doc) {
+          res.json(doc);
+        } else {
+          res.sendStatus(404);
+        }
+      }));
+    }
+
+    // Building views
+    Object.entries(views).forEach(([viewName, { path: viewPath, attributes, buildWhere, include, order }]) => {
+      app.viewsRegistry[viewName] = Resource;
+      app.get(viewPath, asyncHandler(async (req, res) => {
+        const limitParam = parseIntQueryParam(req, 'limit');
+        const docs = await Model.findAndCountAll({
+          attributes: mapAttributes(null, Resource.name, attributes),
+          ...(buildWhere && { where: buildWhere(req) }),
+          include: mapInclude(req, include),
+          offset: parseIntQueryParam(req, 'offset') || 0,
+          limit: (limitParam && limitParam > MaxPageLimit && MaxPageLimit)
+            || limitParam
+            || DefaultPageLimit,
+          order: mapOrder(req.query.order) || order,
+        });
+        res.json(docs);
+      }));
+      app.get(`${viewPath}/:id(\\d+)/`, asyncHandler(async (req, res) => {
+        const doc = await Model.findOne({
+          attributes: mapAttributes(null, Resource.name, attributes),
+          where: {
+            id: req.params.id,
+            ...(buildWhere && buildWhere(req)),
+          },
+          include: mapInclude(req, include),
+        });
+        if (doc) {
+          res.json(doc);
+        } else {
+          res.sendStatus(404);
+        }
+      }));
+    });
+
+    if (operations.includes('post')) {
+      app.post(path, asyncHandler(async (req, res) => {
+        const beforeCreate = getIn(Resource, ['authorize', 'beforeCreate']);
+        if (beforeCreate) {
+          beforeCreate(req);
+        }
+        const authValidate = getIn(Resource, ['authorize', 'validate']);
+        if (authValidate && !authValidate(req)) {
+          throw new ValidationError(null, [
+            new ValidationErrorItem('authorize validation failed', 'forbidden', '$', req.body),
+          ]);
+        }
+        let doc = await Model.create(req.body);
+        doc = await Model.findOne({
+          attributes: mapAttributes(),
+          where: mapWhere(req, { id: doc.id }),
+        });
+        res.send(doc);
+      }));
+    }
+
+    if (operations.includes('put')) {
+      app.put(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
+        const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
+        if (model) {
+          const authValidate = getIn(Resource, ['authorize', 'validate']);
+          if (authValidate && !authValidate(req, model)) {
+            throw new ValidationError(null, [
+              new ValidationErrorItem('authorize validation failed', 'forbidden', '$', req.body),
+            ]);
+          }
+          model.set(req.body);
+          await model.save();
+          const doc = await Model.findOne({
+            attributes: mapAttributes(),
+            where: mapWhere(req, { id: req.params.id }),
+          });
+          res.send(doc);
+        } else {
+          res.sendStatus(404);
+        }
+      }));
+    }
+
+    if (operations.includes('patch')) {
+      app.patch(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
+        const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
+        if (model) {
+          const authValidate = getIn(Resource, ['authorize', 'validate']);
+          if (authValidate && !authValidate(req, model)) {
+            throw new ValidationError(null, [
+              new ValidationErrorItem('authorize validation failed', 'forbidden', '$', req.body),
+            ]);
+          }
+          await model.update(req.body);
+          const doc = await Model.findOne({
+            attributes: mapAttributes(),
+            where: mapWhere(req, { id: req.params.id }),
+          });
+          res.send(doc);
+        } else {
+          res.sendStatus(404);
+        }
+      }));
+    }
+
+    if (operations.includes('delete')) {
+      app.delete(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
+        const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
+        if (model) {
+          await model.destroy();
+          res.sendStatus(204);
+        } else {
+          res.sendStatus(404);
+        }
+      }));
+    }
   };
-
-  const mapOrder = orderParam => orderParam && orderParam.split(',').map(
-    p => p.startsWith('-') ? [p.slice(1), 'DESC'] : [p, 'ASC']
-  );
-
-  if (operations.includes('get')) {
-    app.get(path, asyncHandler(async (req, res) => {
-      const limitParam = parseIntQueryParam(req, 'limit');
-      const docs = await Model.findAndCountAll({
-        attributes: mapAttributes(getIn(req.query, ['params', 'attributes'])),
-        where: mapWhere(req, getIn(req.query, ['params', 'where'])),
-        include: mapInclude(req, getIn(req.query, ['params', 'include'])),
-        // raw: true,
-        offset: parseIntQueryParam(req, 'offset') || 0,
-        limit: (limitParam && limitParam > MaxPageLimit && MaxPageLimit)
-          || limitParam
-          || DefaultPageLimit,
-        order: mapOrder(req.query.order) || Resource.order,
-      });
-      res.json(docs);
-    }));
-
-    app.get(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
-      const doc = await Model.findOne({
-        attributes: mapAttributes(getIn(req.query, ['params', 'attributes'])),
-        where: mapWhere(req, { id: req.params.id }),
-        include: mapInclude(req, getIn(req.query, ['params', 'include'])),
-      });
-      if (doc) {
-        res.json(doc);
-      } else {
-        res.sendStatus(404);
-      }
-    }));
-  }
-
-  // Building views
-  Object.entries(views).forEach(([viewName, { path: viewPath, attributes, buildWhere, include, order }]) => {
-    app.viewsRegistry[viewName] = Resource;
-    app.get(viewPath, asyncHandler(async (req, res) => {
-      const limitParam = parseIntQueryParam(req, 'limit');
-      const docs = await Model.findAndCountAll({
-        attributes: mapAttributes(null, Resource.name, attributes),
-        ...(buildWhere && { where: buildWhere(req) }),
-        include: mapInclude(req, include),
-        offset: parseIntQueryParam(req, 'offset') || 0,
-        limit: (limitParam && limitParam > MaxPageLimit && MaxPageLimit)
-          || limitParam
-          || DefaultPageLimit,
-        order: mapOrder(req.query.order) || order,
-      });
-      res.json(docs);
-    }));
-    app.get(`${viewPath}/:id(\\d+)/`, asyncHandler(async (req, res) => {
-      const doc = await Model.findOne({
-        attributes: mapAttributes(null, Resource.name, attributes),
-        where: {
-          id: req.params.id,
-          ...(buildWhere && buildWhere(req)),
-        },
-        include: mapInclude(req, include),
-      });
-      if (doc) {
-        res.json(doc);
-      } else {
-        res.sendStatus(404);
-      }
-    }));
-  });
-
-  if (operations.includes('post')) {
-    app.post(path, asyncHandler(async (req, res) => {
-      const beforeCreate = getIn(Resource, ['authorize', 'beforeCreate']);
-      if (beforeCreate) {
-        beforeCreate(req);
-      }
-      const authValidate = getIn(Resource, ['authorize', 'validate']);
-      if (authValidate && !authValidate(req)) {
-        throw new ValidationError(null, [
-          new ValidationErrorItem('authorize validation failed', 'forbidden', '$', req.body),
-        ]);
-      }
-      let doc = await Model.create(req.body);
-      doc = await Model.findOne({
-        attributes: mapAttributes(),
-        where: mapWhere(req, { id: doc.id }),
-      });
-      res.send(doc);
-    }));
-  }
-
-  if (operations.includes('put')) {
-    app.put(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
-      const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
-      if (model) {
-        const authValidate = getIn(Resource, ['authorize', 'validate']);
-        if (authValidate && !authValidate(req, model)) {
-          throw new ValidationError(null, [
-            new ValidationErrorItem('authorize validation failed', 'forbidden', '$', req.body),
-          ]);
-        }
-        model.set(req.body);
-        await model.save();
-        const doc = await Model.findOne({
-          attributes: mapAttributes(),
-          where: mapWhere(req, { id: req.params.id }),
-        });
-        res.send(doc);
-      } else {
-        res.sendStatus(404);
-      }
-    }));
-  }
-
-  if (operations.includes('patch')) {
-    app.patch(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
-      const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
-      if (model) {
-        const authValidate = getIn(Resource, ['authorize', 'validate']);
-        if (authValidate && !authValidate(req, model)) {
-          throw new ValidationError(null, [
-            new ValidationErrorItem('authorize validation failed', 'forbidden', '$', req.body),
-          ]);
-        }
-        await model.update(req.body);
-        const doc = await Model.findOne({
-          attributes: mapAttributes(),
-          where: mapWhere(req, { id: req.params.id }),
-        });
-        res.send(doc);
-      } else {
-        res.sendStatus(404);
-      }
-    }));
-  }
-
-  if (operations.includes('delete')) {
-    app.delete(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
-      const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
-      if (model) {
-        await model.destroy();
-        res.sendStatus(204);
-      } else {
-        res.sendStatus(404);
-      }
-    }));
-  }
 };
 
 module.exports = {
   mapException,
   mapQueryParams,
+  extendExpress,
 };
