@@ -36,6 +36,11 @@ const mapException = (err, req, res, _) => {
       message: err.message,
       path: [],
     }]);
+  } else if (err instanceof SyntaxError) {
+    res.status(400).json([{
+      message: err.message,
+      path: [],
+    }]);
   } else {
     console.error(err);
     res.sendStatus(500);
@@ -264,7 +269,7 @@ const extendExpress = (express) => {
 
     if (operations.includes('patch')) {
       app.patch(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
-        const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
+        const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id}) });
         if (model) {
           const authValidate = getIn(Resource, ['authorize', 'validate']);
           if (authValidate && !authValidate(req, model)) {

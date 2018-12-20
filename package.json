@@ -1,6 +1,6 @@
 {
   "name": "serve-sequelize",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Expose securely and conveniently your data to consumers",
   "main": "src/index.js",
   "scripts": {
