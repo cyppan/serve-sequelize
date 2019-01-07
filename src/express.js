@@ -21,15 +21,15 @@ const mapException = (err, req, res, _) => {
     validatorArgs,
   }));
 
-  if (err instanceof ValidationError && Array.isArray(err.errors) && err.errors.length && err.errors[0].message instanceof ValidationErrors) {
+  const validationError = err.errors[0].message instanceof ValidationErrors;
+  const validationErrorInst = err instanceof ValidationError;
+  if (validationErrorInst && Array.isArray(err.errors) && err.errors.length && validationError) {
     res.status(422).json(mapValidationErrors(err.errors[0].message.errors));
   } else if (err instanceof ValidationError) {
     res.status(422).json(
       mapValidationErrors(
-        flatMap(err.errors, e =>
-          e.message instanceof ValidationErrors ? e.message.errors : [e]
-        )
-      )
+        flatMap(err.errors, e => (e.message instanceof ValidationErrors ? e.message.errors : [e])),
+      ),
     );
   } else if (err instanceof ForeignKeyConstraintError) {
     res.status(422).json([{
@@ -62,7 +62,7 @@ const mapQueryParams = (req, res, next) => {
 
 const parseIntQueryParam = (req, key) => {
   if (req.query && req.query[key]) {
-    const n = parseInt(req.query[key]);
+    const n = parseInt(req.query[key], 10);
     return !Number.isNaN(n) && n;
   }
   return null;
@@ -127,7 +127,9 @@ const extendExpress = (express) => {
           ...getIn(resource, ['associations', 'hasMany'], []),
           ...getIn(resource, ['associations', 'hasOne'], []),
           ...getIn(resource, ['associations', 'belongsToMany'], []),
-        ].find(assoc => assoc.resource === (includeResource || (viewResource && viewResource.name)));
+        ].find(
+          assoc => assoc.resource === (includeResource || (viewResource && viewResource.name)),
+        );
         if (hasResourceAssociation) {
           if (includeResource) {
             return {
@@ -139,7 +141,8 @@ const extendExpress = (express) => {
             };
           }
           if (viewResource) {
-            const { attributes: viewAttributes, buildWhere, include: viewInclude } = viewResource.views[view];
+            const tempView = viewResource.views[view];
+            const { attributes: viewAttributes, buildWhere, include: viewInclude } = tempView;
             return {
               model: sequelize.models[viewResource.name],
               ...(buildWhere && { where: buildWhere(req) }),
@@ -155,7 +158,7 @@ const extendExpress = (express) => {
     };
 
     const mapOrder = orderParam => orderParam && orderParam.split(',').map(
-      p => p.startsWith('-') ? [p.slice(1), 'DESC'] : [p, 'ASC']
+      p => (p.startsWith('-') ? [p.slice(1), 'DESC'] : [p, 'ASC']),
     );
 
     if (operations.includes('get')) {
@@ -190,13 +193,17 @@ const extendExpress = (express) => {
     }
 
     // Building views
-    Object.entries(views).forEach(([viewName, { path: viewPath, attributes, buildWhere, include, order }]) => {
+    Object.entries(views).forEach((
+      [viewName, {
+        path: viewPath, attributes, buildWhere, include, order,
+      }],
+    ) => {
       app.viewsRegistry[viewName] = Resource;
       app.get(viewPath, asyncHandler(async (req, res) => {
         const limitParam = parseIntQueryParam(req, 'limit');
         const docs = await Model.findAndCountAll({
           attributes: mapAttributes(Resource.name, attributes, getIn(req.query, ['params', 'attributes'])),
-          ...(buildWhere && { where: buildWhere(req) }),
+          ...(buildWhere && { where: buildWhere(req) }),
           include: mapInclude(req, include),
           offset: parseIntQueryParam(req, 'offset') || 0,
           limit: (limitParam && limitParam > MaxPageLimit && MaxPageLimit)
@@ -227,7 +234,7 @@ const extendExpress = (express) => {
       app.post(path, asyncHandler(async (req, res) => {
         const beforeCreate = getIn(Resource, ['authorize', 'beforeCreate']);
         if (beforeCreate) {
-          beforeCreate(req);
+          beforeCreate(req, sequelize);
         }
         const authValidate = getIn(Resource, ['authorize', 'validate']);
         if (authValidate && !authValidate(req)) {
@@ -254,7 +261,7 @@ const extendExpress = (express) => {
               new ValidationErrorItem('authorize validation failed', 'forbidden', '$', req.body),
             ]);
           }
-          model.set(req.body);
+          model.set(req.body, null, { reset: true });
           await model.save();
           const doc = await Model.findOne({
             attributes: mapAttributes(),
@@ -269,7 +276,11 @@ const extendExpress = (express) => {
 
     if (operations.includes('patch')) {
       app.patch(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
-        const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id}) });
+        const beforeCreate = getIn(Resource, ['authorize', 'beforeCreate']);
+        if (beforeCreate) {
+          beforeCreate(req, sequelize);
+        }
+        const model = await Model.findOne({ where: mapWhere(req, { id: req.params.id }) });
         if (model) {
           const authValidate = getIn(Resource, ['authorize', 'validate']);
           if (authValidate && !authValidate(req, model)) {
