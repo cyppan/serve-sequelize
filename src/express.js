@@ -21,9 +21,8 @@ const mapException = (err, req, res, _) => {
     validatorArgs,
   }));
 
-  const validationError = err.errors[0].message instanceof ValidationErrors;
-  const validationErrorInst = err instanceof ValidationError;
-  if (validationErrorInst && Array.isArray(err.errors) && err.errors.length && validationError) {
+  if (err instanceof ValidationError && Array.isArray(err.errors) && err.errors.length
+    && err.errors[0].message instanceof ValidationErrors) {
     res.status(422).json(mapValidationErrors(err.errors[0].message.errors));
   } else if (err instanceof ValidationError) {
     res.status(422).json(
@@ -247,6 +246,10 @@ const extendExpress = (express) => {
           attributes: mapAttributes(),
           where: mapWhere(req, { id: doc.id }),
         });
+        const afterSave = getIn(Resource, ['routeHooks', 'afterSave']);
+        if (afterSave) {
+          afterSave(req, sequelize, doc);
+        }
         res.send(doc);
       }));
     }
@@ -267,6 +270,10 @@ const extendExpress = (express) => {
             attributes: mapAttributes(),
             where: mapWhere(req, { id: req.params.id }),
           });
+          const afterSave = getIn(Resource, ['routeHooks', 'afterSave']);
+          if (afterSave) {
+            afterSave(req, sequelize, doc);
+          }
           res.send(doc);
         } else {
           res.sendStatus(404);
@@ -293,6 +300,10 @@ const extendExpress = (express) => {
             attributes: mapAttributes(),
             where: mapWhere(req, { id: req.params.id }),
           });
+          const afterSave = getIn(Resource, ['routeHooks', 'afterSave']);
+          if (afterSave) {
+            afterSave(req, sequelize, doc);
+          }
           res.send(doc);
         } else {
           res.sendStatus(404);

@@ -34,7 +34,11 @@ const buildModel = (resource) => {
       delete modelSchema[field].sequelizeType;
       if (modelSchema[field].type === Sequelize.JSONB && fieldSchema.schema) {
         modelSchema[field].validate = modelSchema[field].validate || {};
-        modelSchema[field].validate.nestedSchema = o => validate({[field]: o}, {[field]: fieldSchema}, []);
+        modelSchema[field].validate.nestedSchema = o => validate(
+          { [field]: o },
+          { [field]: fieldSchema },
+          [],
+        );
       }
     }
   });
@@ -68,24 +72,23 @@ const setupAssociations = (resources, { models }) => {
   });
 };
 
-const syncDb = (sequelize, insertFixturesFn) => {
-  return sequelize
-    .authenticate()
-    .then(() => {
-      console.log('Connection has been established successfully.');
-      console.log('Now forcing DB schema sync');
-      return sequelize.sync({ force: true })
-    })
-    .then(() => {
-      if (insertFixturesFn) {
-        console.log('inserting fixtures');
-        return insertFixturesFn();
-      }
-    })
-    .catch((err) => {
-      console.error('Unable to connect to the database:', err);
-    });
-};
+const syncDb = (sequelize, insertFixturesFn) => sequelize
+  .authenticate()
+  .then(() => {
+    console.log('Connection has been established successfully.');
+    console.log('Now forcing DB schema sync');
+    return sequelize.sync({ force: true });
+  })
+  .then(() => {
+    if (insertFixturesFn) {
+      console.log('inserting fixtures');
+      return insertFixturesFn();
+    }
+    return null;
+  })
+  .catch((err) => {
+    console.error('Unable to connect to the database:', err);
+  });
 
 const connect = (config) => {
   const { Op } = Sequelize;

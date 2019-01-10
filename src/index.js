@@ -15,4 +15,5 @@ module.exports = {
   extendExpress,
   genOpenApiJson,
   genSwaggerJson,
+  validateResource,
 };
