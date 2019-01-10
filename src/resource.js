@@ -162,7 +162,7 @@ const schema = {
     validate: {
       allowedKeys: [
         'name', 'path', 'associations', 'operations', 'schema', 'views',
-        'attributes', 'authorize', 'hooks', 'order', 'root',
+        'attributes', 'authorize', 'hooks', 'order', 'routeHooks',
       ],
     },
   },
