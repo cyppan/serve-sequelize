@@ -72,12 +72,12 @@ const setupAssociations = (resources, { models }) => {
   });
 };
 
-const syncDb = (sequelize, insertFixturesFn) => sequelize
+const syncDb = (sequelize, insertFixturesFn, opts = {}) => sequelize
   .authenticate()
   .then(() => {
     console.log('Connection has been established successfully.');
     console.log('Now forcing DB schema sync');
-    return sequelize.sync({ force: true });
+    return sequelize.sync(opts);
   })
   .then(() => {
     if (insertFixturesFn) {
