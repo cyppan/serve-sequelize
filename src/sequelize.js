@@ -23,6 +23,7 @@ const buildModel = (resource) => {
   const modelSchema = {};
   const modelOptions = {
     hooks: resource.hooks,
+    paranoid: resource.softDelete === false ? false : true
   };
   Object.entries(resource.schema).forEach(([field, fieldSchema]) => {
     if (field === '$') {
