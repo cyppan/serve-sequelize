@@ -174,7 +174,14 @@ const extendExpress = (express) => {
             || DefaultPageLimit,
           order: mapOrder(req.query.order) || Resource.order,
         });
-        res.json(docs);
+        const afterGetAll = getIn(Resource, ['routeHooks', 'afterGetAll']);
+        if (afterGetAll) {
+          afterGetAll(req, sequelize, docs).then(docs => {
+            res.json(docs)
+          });
+        } else {
+          res.json(docs);
+        }
       }));
 
       app.get(`${path}/:id(\\d+)/`, asyncHandler(async (req, res) => {
